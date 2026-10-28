@@ -476,7 +476,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .t-why b{color:var(--teal)}
 
 /* full screen */
-.fs-btn{display:inline-flex;align-items:center;gap:6px}
+.fs-btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:#fff}
 .fs-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .fs-btn .fs-out{display:none}
 .fs-btn[aria-pressed="true"] .fs-in{display:none}
@@ -1385,7 +1385,13 @@ buildEx('ex1'); buildEx('ex2');
   const root=document.documentElement;
   const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
   const can=root.requestFullscreen||root.webkitRequestFullscreen;
-  if(!can||document.fullscreenEnabled===false&&!document.webkitFullscreenEnabled){btn.hidden=true;return}
+  if(!can||document.fullscreenEnabled===false&&!document.webkitFullscreenEnabled){
+    /* inside an iframe without full screen permission (e.g. a Canvas embed): offer the page in its own tab instead */
+    const link=document.createElement('a');
+    link.className='tb-btn fs-btn'; link.href='https://claude.ai/artifact/Fr7J2GH6ggZn217Nsx1MNQ'; link.target='_blank'; link.rel='noopener';
+    link.title='Full screen is not available inside this frame. Open the page in its own tab, then use Full screen there.';
+    link.innerHTML='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2h5v5M14 2 7.5 8.5M12 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3.5"/></svg><span>Open in new tab</span>';
+    btn.replaceWith(link); return}
   const sync=()=>{const on=!!fsEl();btn.setAttribute('aria-pressed',on);btn.title=on?'Exit full screen':'Full screen';btn.querySelector('span').textContent=on?'Exit full screen':'Full screen';root.classList.toggle('is-fs',on)};
   btn.addEventListener('click',async()=>{
     const cur=state.slide;
