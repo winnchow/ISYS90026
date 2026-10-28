@@ -496,6 +496,17 @@ html.nopanel .panel{display:none}
 @media (max-width:900px){.p-x{display:none}}
 @media (max-width:600px){.pn-btn span{display:none}}
 
+/* red pen */
+.pen-btn{display:inline-flex;align-items:center;gap:6px}
+.pen-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.pen-btn[aria-pressed="true"]{background:#d6262b;border-color:#d6262b;color:#fff}
+.ink{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;touch-action:auto}
+.p-bd{position:relative}
+.ink.p-ink{inset:0 0 auto 0;z-index:5}
+html.pen-on .ink{pointer-events:auto;touch-action:none;cursor:crosshair}
+html.pen-on .hs{pointer-events:none}
+@media (max-width:600px){.pen-btn span{display:none}}
+
 /* image slides with keyword hotspots */
 .frame{position:relative;line-height:0;background:#fff}
 .frame img{width:100%;height:auto;display:block}
@@ -510,7 +521,7 @@ html.nopanel .panel{display:none}
 
 <header class="topbar"><div class="topbar-in">
   <div class="brand"><small>ISYS90026 · Week 10</small><b>Responsible Business</b></div>
-  <div class="prog"><div class="prog-track"><div class="prog-fill" id="progFill"></div></div><span class="prog-n" id="progN">1 / 21</span></div><button class="tb-btn pn-btn" id="pnToggle" aria-pressed="true" title="Hide the explanations and quiz panel"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/><path class="pn-fill" d="M10 2.5h3a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-3z"/></svg><span>Hide explanations</span></button><button class="tb-btn fs-btn" id="fsToggle" aria-pressed="false" title="Full screen"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fs-in" d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/><path class="fs-out" d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"/></svg><span>Full screen</span></button>
+  <div class="prog"><div class="prog-track"><div class="prog-fill" id="progFill"></div></div><span class="prog-n" id="progN">1 / 21</span></div><button class="tb-btn pen-btn" id="penToggle" aria-pressed="false" title="Draw on the slides and explanations in red (P)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.2 2.3a1.6 1.6 0 0 1 2.3 2.3L5.6 12.5 2.5 13.5l1-3.1z"/><path d="M9.8 3.7l2.5 2.5"/></svg><span>Pen</span></button><button class="tb-btn" id="inkClear" hidden title="Remove all drawings">Clear drawings</button><button class="tb-btn pn-btn" id="pnToggle" aria-pressed="true" title="Hide the explanations and quiz panel"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/><path class="pn-fill" d="M10 2.5h3a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-3z"/></svg><span>Hide explanations</span></button><button class="tb-btn fs-btn" id="fsToggle" aria-pressed="false" title="Full screen"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fs-in" d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/><path class="fs-out" d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"/></svg><span>Full screen</span></button>
   
 </div></header>
 
@@ -1140,7 +1151,7 @@ function showPop(el,forceId){
 }
 /* quick popups only appear while the explanations panel is hidden */
 function explanationsVisible(){return !document.documentElement.classList.contains('nopanel')&&(innerWidth>900||panel.classList.contains('open'))}
-function popOK(kw){return !kw.closest('#s22')&&!explanationsVisible()}
+function popOK(kw){return !kw.closest('#s22')&&!explanationsVisible()&&!document.documentElement.classList.contains('pen-on')}
 function hidePop(){pop.classList.remove('show');popTerm=null;document.querySelectorAll('.kw.on,.kt.on').forEach(x=>x.classList.remove('on'))}
 function schedHide(){clearTimeout(hideT);hideT=setTimeout(hidePop,220)}
 
@@ -1422,6 +1433,59 @@ document.getElementById('pHide').addEventListener('click',()=>setPanel(false));
 document.addEventListener('click',e=>{if(!panelShown()&&e.target.closest('.kw,.kt')) setPanel(true)},true);
 document.addEventListener('keydown',e=>{if(!panelShown()&&(e.key==='Enter'||e.key===' ')&&e.target.closest&&e.target.closest('.kw,.kt')) setPanel(true)},true);
 if(store.get('panel',true)===false) setPanel(false,false);
+/* ======================= RED PEN ======================= */
+(function(){
+  const btn=document.getElementById('penToggle'), clr=document.getElementById('inkClear'), root=document.documentElement;
+  if(!btn) return;
+  const INK='#d6262b', pads=[], history=[];
+  /* norm=true: points stored as fractions of the slide, so drawings survive resizing */
+  function makePad(c,norm){
+    const pad={c,norm,strokes:[],cur:null}; pads.push(pad);
+    const pt=e=>{const r=c.getBoundingClientRect();return norm?[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]:[e.clientX-r.left,e.clientY-r.top]};
+    c.addEventListener('pointerdown',e=>{if(!root.classList.contains('pen-on'))return;e.preventDefault();c.setPointerCapture(e.pointerId);pad.cur=[pt(e)];pad.strokes.push(pad.cur);history.push(pad);draw(pad);sync()});
+    c.addEventListener('pointermove',e=>{if(!pad.cur)return;const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];evs.forEach(ev=>pad.cur.push(pt(ev)));draw(pad)});
+    const end=()=>{pad.cur=null};
+    c.addEventListener('pointerup',end); c.addEventListener('pointercancel',end);
+    return pad;
+  }
+  function size(pad){const r=pad.c.getBoundingClientRect(),d=devicePixelRatio||1,w=Math.round(r.width*d),h=Math.round(r.height*d);if(pad.c.width!==w||pad.c.height!==h){pad.c.width=w;pad.c.height=h}}
+  function draw(pad){
+    size(pad); const g=pad.c.getContext('2d'), W=pad.c.width, H=pad.c.height, d=devicePixelRatio||1;
+    const sx=pad.norm?W:d, sy=pad.norm?H:d;
+    g.clearRect(0,0,W,H); g.strokeStyle=INK; g.lineCap='round'; g.lineJoin='round'; g.lineWidth=pad.norm?Math.max(2,W*0.0028):3*d;
+    pad.strokes.forEach(s=>{g.beginPath();s.forEach(([x,y],i)=>i?g.lineTo(x*sx,y*sy):g.moveTo(x*sx,y*sy));if(s.length===1)g.lineTo(s[0][0]*sx+0.1,s[0][1]*sy);g.stroke()});
+  }
+  const any=()=>pads.some(p=>p.strokes.length);
+  function sync(){clr.hidden=!any()}
+  function forget(pad){for(let i=history.length-1;i>=0;i--) if(history[i]===pad) history.splice(i,1)}
+  /* slides */
+  document.querySelectorAll('.frame').forEach(fr=>{const c=document.createElement('canvas');c.className='ink';fr.appendChild(c);makePad(c,true)});
+  const ro=new ResizeObserver(es=>es.forEach(en=>{const p=pads.find(p=>p.c.parentElement===en.target);if(p&&p.strokes.length)draw(p)}));
+  document.querySelectorAll('.frame').forEach(fr=>ro.observe(fr));
+  /* explanations panel: a fresh layer each time its content changes */
+  let pPad=null;
+  function panelLayer(){
+    if(pPad){const i=pads.indexOf(pPad);if(i>=0)pads.splice(i,1);forget(pPad);pPad=null}
+    const c=document.createElement('canvas'); c.className='ink p-ink';
+    c.style.height=pBody.scrollHeight+'px';
+    pBody.appendChild(c); pPad=makePad(c,false); sync();
+  }
+  const _render=render;
+  render=function(){_render.apply(this,arguments);panelLayer()};
+  new ResizeObserver(()=>{if(!pPad)return;const h=pBody.scrollHeight;if(parseFloat(pPad.c.style.height)<h){pPad.c.style.height=h+'px';draw(pPad)}}).observe(pBody);
+  panelLayer();
+  function setPen(on){root.classList.toggle('pen-on',on);btn.setAttribute('aria-pressed',on);btn.querySelector('span').textContent=on?'Pen on':'Pen';btn.title=on?'Stop drawing (P or Esc)':'Draw on the slides and explanations in red (P)';if(on)hidePop()}
+  btn.addEventListener('click',()=>setPen(!root.classList.contains('pen-on')));
+  clr.addEventListener('click',()=>{pads.forEach(p=>{p.strokes=[];draw(p)});history.length=0;sync()});
+  document.addEventListener('keydown',e=>{
+    if(e.target.closest&&e.target.closest('input,select,textarea'))return;
+    if((e.key==='p'||e.key==='P')&&!e.metaKey&&!e.ctrlKey&&!e.altKey) setPen(!root.classList.contains('pen-on'));
+    else if(e.key==='Escape'&&root.classList.contains('pen-on')) setPen(false);
+    else if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z')&&root.classList.contains('pen-on')){
+      const p=history.pop(); if(p){e.preventDefault();p.strokes.pop();draw(p);sync()}
+    }
+  });
+})();
 
 /* ======================= INIT ======================= */
 store.set('notes',[]);
