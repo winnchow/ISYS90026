@@ -1151,7 +1151,7 @@ function showPop(el,forceId){
 }
 /* quick popups only appear while the explanations panel is hidden */
 function explanationsVisible(){return !document.documentElement.classList.contains('nopanel')&&(innerWidth>900||panel.classList.contains('open'))}
-function popOK(kw){return !kw.closest('#s22')&&!explanationsVisible()&&!document.documentElement.classList.contains('pen-on')}
+function popOK(kw){return !kw.closest('#s22')&&!explanationsVisible()}
 function hidePop(){pop.classList.remove('show');popTerm=null;document.querySelectorAll('.kw.on,.kt.on').forEach(x=>x.classList.remove('on'))}
 function schedHide(){clearTimeout(hideT);hideT=setTimeout(hidePop,220)}
 
@@ -1442,11 +1442,25 @@ if(store.get('panel',true)===false) setPanel(false,false);
   function makePad(c,norm){
     const pad={c,norm,strokes:[],cur:null}; pads.push(pad);
     const pt=e=>{const r=c.getBoundingClientRect();return norm?[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]:[e.clientX-r.left,e.clientY-r.top]};
-    c.addEventListener('pointerdown',e=>{if(!root.classList.contains('pen-on'))return;e.preventDefault();c.setPointerCapture(e.pointerId);pad.cur=[pt(e)];pad.strokes.push(pad.cur);history.push(pad);draw(pad);sync()});
-    c.addEventListener('pointermove',e=>{if(!pad.cur)return;const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];evs.forEach(ev=>pad.cur.push(pt(ev)));draw(pad)});
+    c.addEventListener('pointerdown',e=>{if(!root.classList.contains('pen-on'))return;e.preventDefault();if(norm){hovKw=null;clearTimeout(panelT);hidePop()}c.setPointerCapture(e.pointerId);pad.cur=[pt(e)];pad.strokes.push(pad.cur);history.push(pad);draw(pad);sync()});
+    c.addEventListener('pointermove',e=>{if(!pad.cur){if(norm&&e.buttons===0)hoverAt(c,e);return}const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];evs.forEach(ev=>pad.cur.push(pt(ev)));draw(pad)});
+    if(norm) c.addEventListener('pointerleave',()=>hoverAt(null));
     const end=()=>{pad.cur=null};
     c.addEventListener('pointerup',end); c.addEventListener('pointercancel',end);
     return pad;
+  }
+  /* while the pen is on, keywords under the pointer still respond when you are not drawing */
+  let hovKw=null;
+  function hoverAt(c,e){
+    let kw=null;
+    if(c&&root.classList.contains('pen-on')){
+      for(const h of c.parentElement.querySelectorAll('.hs')){const r=h.getBoundingClientRect();if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom){kw=h;break}}
+    }
+    if(kw===hovKw) return;
+    hovKw=kw; clearTimeout(panelT);
+    if(!kw){schedHide();return}
+    if(popOK(kw)) showPop(kw); else hidePop();
+    panelT=setTimeout(()=>setTerm(kw.dataset.t,false),280);
   }
   function size(pad){const r=pad.c.getBoundingClientRect(),d=devicePixelRatio||1,w=Math.round(r.width*d),h=Math.round(r.height*d);if(pad.c.width!==w||pad.c.height!==h){pad.c.width=w;pad.c.height=h}}
   function draw(pad){
